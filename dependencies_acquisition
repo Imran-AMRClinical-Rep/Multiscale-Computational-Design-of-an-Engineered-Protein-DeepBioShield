@@ -1,0 +1,23 @@
+pip install -r requirements.txt
+  numpy>=1.21.0
+pandas>=1.3.0
+matplotlib>=3.4.0
+seaborn>=0.11.0
+scipy>=1.7.0
+scikit-learn>=1.0.0
+torch>=1.9.0
+transformers>=4.11.0
+biopython>=1.79
+cobra>=0.22.0
+requests>=2.26.0
+tqdm>=4.62.0
+  python 00_Data_Acquisition.py
+  
+  #to execute pipeline
+  python 01_Generative_Design.py
+python 02_Biosafety_and_Folding.py
+python 03_FBA_Metabolism.py
+python 04_Thermodynamics_Kinetics.py
+python 05_ADRE_Transport_and_Health.py
+python 06_Lotka_Volterra_Dynamics.py
+python 07_Genetic_Circuit.py
