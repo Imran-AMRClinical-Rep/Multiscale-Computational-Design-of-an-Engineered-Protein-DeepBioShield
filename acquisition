@@ -1,0 +1,90 @@
+***
+
+### `00_Data_Acquisition.py` (The Prerequisite Script)
+
+This script specifically addresses your request to show where the data comes from. It interacts securely with the real UniProt API to download, filter, and save the dataset used by the downstream AI models.
+
+```python
+"""
+Deep-BioShield Repository
+Prerequisite Script 00: Data Acquisition & Setup
+Downloads authentic, reviewed prokaryotic arsenic resistance sequences from UniProt.
+"""
+
+import os
+import requests
+import pandas as pd
+from io import StringIO
+
+def fetch_uniprot_family(gene_query, label, limit=100):
+    """
+    Queries the UniProt REST API for specific gene families.
+    Filters: Reviewed (Swiss-Prot) and Taxonomy ID 2 (Bacteria).
+    """
+    print(f"Fetching data for {label}...")
+    url = "https://rest.uniprot.org/uniprotkb/search"
+    query = f"({gene_query}) AND reviewed:true AND taxonomy_id:2"
+    params = {
+        "query": query,
+        "format": "tsv",
+        "fields": "accession,id,gene_names,sequence,length",
+        "size": limit
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=20)
+        if response.status_code == 200 and len(response.text.strip()) > 0:
+            df = pd.read_csv(StringIO(response.text), sep="\t")
+            df["Functional_Label"] = label
+            print(f" -> Successfully retrieved {len(df)} records.")
+            return df
+        else:
+            print(f" -> No records found or API error (Status: {response.status_code}).")
+            return pd.DataFrame()
+    except Exception as e:
+        print(f" -> Connection failed: {e}")
+        return pd.DataFrame()
+
+def build_benchmark_dataset():
+    print("--- Initiating Deep-BioShield Data Mining Pipeline ---")
+    
+    # Target Canonical Arsenic Resistance Operon Genes
+    df_arsr = fetch_uniprot_family("gene:arsR", "ArsR (Regulator)")
+    df_arsc = fetch_uniprot_family("gene:arsC", "ArsC (Reductase)")
+    df_acr3 = fetch_uniprot_family("gene:acr3 OR gene:arsB", "Acr3/ArsB (Efflux)")
+    
+    # Combine datasets
+    df_master = pd.concat([df_arsr, df_arsc, df_acr3], ignore_index=True)
+    
+    if df_master.empty:
+        print("\nCRITICAL: Failed to retrieve data. Check internet connection or UniProt API status.")
+        return
+        
+    # Rigorous Quality Control Filters (matches Section 2.1 of the manuscript)
+    initial_count = len(df_master)
+    
+    # 1. Drop missing sequences
+    df_master = df_master.dropna(subset=["Sequence"])
+    
+    # 2. Remove exact duplicates
+    df_master = df_master.drop_duplicates(subset=["Sequence"])
+    
+    # 3. Filter length (50 to 300 Amino Acids) to exclude fragments/misannotations
+    df_master = df_master[(df_master["Length"] >= 50) & (df_master["Length"] <= 300)]
+    
+    # Reset index after cleaning
+    df_master = df_master.reset_index(drop=True)
+    
+    final_count = len(df_master)
+    print(f"\n--- Quality Control Complete ---")
+    print(f"Initial sequences retrieved: {initial_count}")
+    print(f"Sequences passing QC: {final_count}")
+    
+    # Save the prerequisite data file for Step 01
+    output_file = "arsenic_proteins_dataset.csv"
+    df_master.to_csv(output_file, index=False)
+    print(f" Benchmark dataset saved to '{output_file}'.")
+    print("You may now execute '01_Generative_Design.py'.")
+
+if __name__ == "__main__":
+    build_benchmark_dataset()
